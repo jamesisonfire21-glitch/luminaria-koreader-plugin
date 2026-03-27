@@ -10,7 +10,7 @@ A KOReader plugin that syncs your highlights directly to [Luminaria](https://lum
 
 ## Requirements
 
-- A Kobo device running KOReader
+- A device running KOReader
 - A free Luminaria sync token — get one at [luminaria.uk/signup.html](https://luminaria.uk/signup.html)
 
 ## Installation
@@ -19,17 +19,17 @@ A KOReader plugin that syncs your highlights directly to [Luminaria](https://lum
    - `main.lua`
    - `_meta.lua`
 
-2. **Connect your Kobo** to your computer via USB
+2. **Connect your Device** to your computer via USB
 
 3. **Create the plugin folder**
-   Navigate to `koreader/plugins/` on your Kobo and create a new folder named:
+   Navigate to `koreader/plugins/` on your device and create a new folder named:
    ```
    luminaria.koplugin
    ```
 
 4. **Copy both files** into the `luminaria.koplugin` folder
 
-5. **Safely eject** your Kobo and restart KOReader fully (hold power → restart)
+5. **Safely eject** your device and restart KOReader fully (hold power → restart)
 
 6. **Enable the plugin** — go to:
    ```
@@ -48,7 +48,7 @@ A KOReader plugin that syncs your highlights directly to [Luminaria](https://lum
    ```
    Menu → ⋮ More → Network → Enable WiFi
    ```
-   Make sure your Kobo is connected before syncing.
+   Make sure your device running KOReader is connected before syncing.
 
 2. **Export your highlights** in KOReader:
    **Top menu → Search → Export all highlights**
@@ -70,7 +70,7 @@ Make sure the folder is named exactly `luminaria.koplugin` and contains both `ma
 Make sure you have run Export all highlights in KOReader before syncing. The plugin looks for the latest `.md` file in your clipboard folder.
 
 **Sync failed — network error**
-Make sure WiFi is enabled and your Kobo is connected to a network before syncing. Go to **Menu → ⋮ More → Network → Enable WiFi**.
+Make sure WiFi is enabled and your device is connected to a network before syncing. Go to **Menu → ⋮ More → Network → Enable WiFi**.
 
 **Sync failed — invalid token**
 Double-check your token was copied correctly from the registration email with no extra spaces. You can re-enter it in **Menu → Luminaria Sync → Settings**.
