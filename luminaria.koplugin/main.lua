@@ -557,6 +557,90 @@ function LuminariaSyncPlugin:addToMainMenu(menu_items)
         callback = exportAndSync,
       },
       {
+        text     = "Link device (6-digit code)",
+        callback = function()
+          -- Lazy load http/ltn12 for the redeem request
+          if not http then
+            local ok, m = pcall(require, "socket.http") if ok then http = m end
+          end
+          if not ltn12 then
+            local ok, m = pcall(require, "ltn12") if ok then ltn12 = m end
+          end
+
+          local dialog
+          dialog = require("ui/widget/inputdialog"):new{
+            title       = "Link device",
+            input_hint  = "Enter 6-digit code from luminaria.uk/link",
+            description = "Go to luminaria.uk/link on your computer, enter your token and get a 6-digit code. Type it here.",
+            buttons = {
+              {
+                {
+                  text = "Cancel",
+                  callback = function() UIManager:close(dialog) end,
+                },
+                {
+                  text = "Link",
+                  is_enter_default = true,
+                  callback = function()
+                    local code = dialog:getInputText():match("^%s*(.-)%s*$"):gsub("%s+", "")
+                    UIManager:close(dialog)
+
+                    if #code ~= 6 or not code:match("^%d+$") then
+                      UIManager:show(InfoMessage:new{
+                        text = "Please enter the 6-digit code\nfrom luminaria.uk/link",
+                        timeout = 3,
+                      })
+                      return
+                    end
+
+                    local msg = showStatus("Luminaria: Linking device…")
+
+                    -- Redeem the code
+                    local response_body = {}
+                    local redeem_url = WORKER_URL .. "/link/redeem?code=" .. code
+                    local ok_req, err_req = pcall(function()
+                      if https then
+                        https.request{
+                          url    = redeem_url,
+                          method = "GET",
+                          sink   = ltn12.sink.table(response_body),
+                        }
+                      elseif http then
+                        http.request{
+                          url    = redeem_url,
+                          method = "GET",
+                          sink   = ltn12.sink.table(response_body),
+                        }
+                      end
+                    end)
+
+                    UIManager:close(msg)
+
+                    local body = table.concat(response_body)
+                    local token = body:match('"token":"([^"]+)"')
+
+                    if token then
+                      setSetting("upload_token", token)
+                      UIManager:show(InfoMessage:new{
+                        text    = "✓ Device linked!\n\nYour token has been saved.\nYou can now sync your highlights.",
+                        timeout = 5,
+                      })
+                    else
+                      local errMsg = body:match('"error":"([^"]+)"') or "Unknown error"
+                      UIManager:show(InfoMessage:new{
+                        text    = "✗ Link failed: " .. errMsg .. "\n\nCodes expire after 10 minutes.\nGenerate a new one at luminaria.uk/link",
+                        timeout = 5,
+                      })
+                    end
+                  end,
+                },
+              },
+            },
+          }
+          UIManager:show(dialog)
+        end,
+      },
+      {
         text = "Auto-sync on WiFi",
         checked_func = function()
           return getSetting("auto_sync", true) == true
