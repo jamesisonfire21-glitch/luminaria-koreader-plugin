@@ -412,40 +412,6 @@ local function checkTier(token)
       local ok2, m = pcall(require, "ssl.https")
       if ok2 then https = m end
     end
-    if https then
-      https.request{
-        url     = WORKER_URL .. "/tier",
-        method  = "GET",
-        headers = { ["Authorization"] = "Bearer " .. token },
-        sink    = ltn12.sink.table(response_body),
-      }
-    end
-  end)
-
-  local body = table.concat(response_body)
-  if body:find('"paid"') then return "paid" end
-  return "free"
-end
-
--- ── Check if token is paid tier
-local function checkTier(token)
-  if not http then
-    local ok, m = pcall(require, "socket.http")
-    if not ok then return "free" end
-    http = m
-  end
-  if not ltn12 then
-    local ok, m = pcall(require, "ltn12")
-    if not ok then return "free" end
-    ltn12 = m
-  end
-
-  local response_body = {}
-  local ok, code = pcall(function()
-    if not https then
-      local ok2, m = pcall(require, "ssl.https")
-      if ok2 then https = m end
-    end
     local requester = https or http
     requester.request{
       url     = WORKER_URL .. "/tier",
@@ -483,31 +449,54 @@ local function onWifiConnected()
 end
 
 -- ── Wake from sleep handler
--- Fires when device wakes — syncs if WiFi is already connected
+local wakeInProgress = false  -- guard against multiple firings per wake
+
 local function onWake()
   if not getSetting("auto_sync", true) then return end
   local token = getSetting("upload_token", "")
   if token == "" then return end
 
-  -- Small delay to let WiFi reconnect after wake
-  UIManager:scheduleIn(8, function()
-    -- Only proceed if already connected — don't turn WiFi on
+  -- Prevent multiple simultaneous wake syncs
+  if wakeInProgress then
+    logger.info("Luminaria: wake already in progress — skipping")
+    return
+  end
+  wakeInProgress = true
+
+  logger.info("Luminaria: device woke — will poll for WiFi connection")
+
+  local attempts = 0
+  local max_attempts = 12  -- 12 x 5s = 60 seconds max wait
+
+  local function checkConnection()
+    attempts = attempts + 1
+    logger.info("Luminaria: wake poll attempt " .. attempts)
+
     local nmok, nm = pcall(require, "ui/network/manager")
-    if not nmok or not nm then return end
-    if not nm:isConnected() then
-      logger.info("Luminaria: woke but no WiFi — skipping sync")
-      return
-    end
+    if not nmok or not nm then wakeInProgress = false; return end
 
-    logger.info("Luminaria: woke with WiFi connected — checking tier")
-    local tier = checkTier(token)
-    if tier ~= "paid" then
-      logger.info("Luminaria: free tier — wake sync skipped")
-      return
-    end
+    local connected = false
+    pcall(function() connected = nm:isConnected() end)
 
-    exportAndSync()
-  end)
+    if connected then
+      logger.info("Luminaria: WiFi connected after wake — checking tier")
+      local tier = checkTier(token)
+      if tier ~= "paid" then
+        logger.info("Luminaria: free tier — wake sync skipped")
+        wakeInProgress = false
+        return
+      end
+      exportAndSync()
+      wakeInProgress = false
+    elseif attempts < max_attempts then
+      UIManager:scheduleIn(5, checkConnection)
+    else
+      logger.info("Luminaria: gave up waiting for WiFi after wake")
+      wakeInProgress = false
+    end
+  end
+
+  UIManager:scheduleIn(5, checkConnection)
 end
 
 -- ── Plugin class
@@ -517,9 +506,11 @@ local LuminariaSyncPlugin = WidgetContainer:extend{
   is_doc_only = false,
 }
 
--- Called by KOReader when device wakes from sleep
+-- onResume is called when the plugin widget is visible on screen
+-- For file manager context we also hook UIManager directly in init
 function LuminariaSyncPlugin:onResume()
   onWake()
+  return false  -- don't consume the event
 end
 
 function LuminariaSyncPlugin:init()
@@ -527,6 +518,24 @@ function LuminariaSyncPlugin:init()
   if self.ui and self.ui.menu then
     self.ui.menu:registerToMainMenu(self)
   end
+
+  -- Hook UIManager's broadcastEvent to catch Resume in all contexts
+  -- Wrapped in pcall so a missing method doesn't crash plugin init
+  pcall(function()
+    if UIManager.broadcastEvent then
+      local orig_broadcast = UIManager.broadcastEvent
+      UIManager.broadcastEvent = function(uimgr, event, ...)
+        local event_name = type(event) == "table" and event.name or tostring(event)
+        if event_name == "Resume" then
+          logger.info("Luminaria: Resume event caught via broadcastEvent")
+          onWake()
+        end
+        return orig_broadcast(uimgr, event, ...)
+      end
+    else
+      logger.info("Luminaria: broadcastEvent not available — wake sync via onResume only")
+    end
+  end)
 
   -- Hook into export menu
   local ok, ExportHelper = pcall(require, "apps/filemanager/filemanagerexport")
