@@ -7,14 +7,14 @@ Sync your KOReader highlights to [Luminaria](https://luminaria.uk) — a private
 ## What it does
 
 - **Manual sync** — tap *Sync highlights now* in the menu and your highlights upload to Luminaria in seconds
-- **Auto-sync on WiFi** *(paid feature)* — when your Kobo connects to WiFi, the plugin automatically exports all your highlights and syncs them to Luminaria. No tapping required
+- **Auto-sync on WiFi** *(paid feature)* — when your device connects to WiFi, the plugin automatically exports all your highlights and syncs them to Luminaria. No tapping required
 
 ---
 
 ## Installation
 
 1. Download this repository as a ZIP
-2. On your Kobo, navigate to:
+2. On device, navigate to:
    ```
    mnt/onboard/.adds/koreader/plugins/
    ```
@@ -49,7 +49,7 @@ The plugin will export all highlights from your reading history and upload them 
 
 ### Auto-sync on WiFi (paid — £2.99/month)
 
-With an active subscription, every time your Kobo connects to WiFi the plugin automatically exports and syncs your highlights in the background.
+With an active subscription, every time your device connects to WiFi the plugin automatically exports and syncs your highlights in the background.
 
 To enable: subscribe at [luminaria.uk/upgrade.html](https://luminaria.uk/upgrade.html), then toggle **Auto-sync on WiFi** in the plugin menu.
 
@@ -92,7 +92,7 @@ If you have auto-sync enabled, Luminaria detects new syncs automatically and upd
 
 ## Supported devices
 
-Tested on Kobo Libra with KOReader. Should work on any Kobo device running KOReader. May also work on Kindle and other devices running KOReader but has not been tested.
+Tested on Kobo Libra with KOReader. Should work on any device running KOReader. May also work on Kindle and other devices running KOReader but has not been tested.
 
 ---
 
