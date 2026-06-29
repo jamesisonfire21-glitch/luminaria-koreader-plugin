@@ -479,12 +479,12 @@ end
 local function checkTier(token)
   if not http then
     local ok, m = pcall(require, "socket.http")
-    if not ok then return "free" end
+    if not ok then return "unknown" end
     http = m
   end
   if not ltn12 then
     local ok, m = pcall(require, "ltn12")
-    if not ok then return "free" end
+    if not ok then return "unknown" end
     ltn12 = m
   end
 
@@ -506,16 +506,22 @@ local function checkTier(token)
     response_code = code
   end)
 
+  -- "unknown" means we couldn't reach the server — NOT the same as a confirmed free tier.
+  -- Callers should not show an upgrade prompt on "unknown", only on a confirmed "free".
   if not ok then
     logger.warn("Luminaria: checkTier network error")
-    return "free"
+    return "unknown"
   end
   if response_code ~= 200 then
     logger.warn("Luminaria: checkTier HTTP " .. tostring(response_code))
-    return "free"
+    return "unknown"
   end
   local body = table.concat(response_body)
-  if body:find('"paid"') then return "paid" end
+  if body:find('"paid"') then
+    setSetting("last_known_tier", "paid")
+    return "paid"
+  end
+  setSetting("last_known_tier", "free")
   return "free"
 end
 
@@ -537,8 +543,21 @@ local function onWifiConnected()
 
   logger.info("Luminaria: WiFi connected — checking tier")
 
-  UIManager:scheduleIn(4, function()
+  UIManager:scheduleIn(6, function()
     local tier = checkTier(token)
+
+    if tier == "unknown" then
+      -- Couldn't reach the server (likely WiFi not fully ready yet) — fall back to
+      -- the last confirmed tier rather than assuming free. Never show the upgrade
+      -- prompt based on a failed check.
+      local lastKnown = getSetting("last_known_tier", "free")
+      logger.info("Luminaria: tier check failed — using last known tier (" .. lastKnown .. ")")
+      if lastKnown == "paid" then
+        exportAndSync(isReaderOpen())
+      end
+      return
+    end
+
     if tier ~= "paid" then
       logger.info("Luminaria: free tier — auto-sync skipped")
       -- Only show upgrade prompt if reader is not open
@@ -810,6 +829,13 @@ function LuminariaSyncPlugin:addToMainMenu(menu_items)
             local msg = showStatus("Luminaria: Checking subscription…")
             local tier = checkTier(token)
             UIManager:close(msg)
+            if tier == "unknown" then
+              UIManager:show(InfoMessage:new{
+                text    = "Couldn't reach Luminaria to check your subscription.\n\nCheck your connection and try again.",
+                timeout = 4,
+              })
+              return
+            end
             if tier ~= "paid" then
               UIManager:show(InfoMessage:new{
                 text    = "Auto-sync requires a subscription.\n\nVisit luminaria.uk/upgrade\nto subscribe for £2.99/month.",
